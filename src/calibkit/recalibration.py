@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import TypeVar
 
 import numpy as np
@@ -262,3 +263,37 @@ class HistogramCalibrator(Recalibrator):
 
     def _predict(self, p: FloatArray) -> FloatArray:
         return self.values_[assign_bins(p, self.edges_)]
+
+
+def cross_calibrate(
+    make: Callable[[], Recalibrator],
+    y_prob: ArrayLike,
+    y_true: ArrayLike,
+    n_splits: int = 5,
+    seed: int = 0,
+) -> FloatArray:
+    """Out-of-fold recalibrated probabilities.
+
+    The data are split into ``n_splits`` stratified folds. Each fold is
+    recalibrated by a fresh recalibrator from ``make()`` fitted on the other
+    folds only, so no forecast is ever adjusted using its own label. Score the
+    result with any metric to get an honest estimate of what the recalibrator
+    does on new data, without holding out a separate set.
+    """
+    y, p = check_pair(y_true, y_prob)
+    if not isinstance(n_splits, int) or n_splits < 2:
+        raise ValueError(f"n_splits must be an integer >= 2, got {n_splits!r}")
+    n_pos = int(y.sum())
+    if min(n_pos, y.size - n_pos) < n_splits:
+        raise ValueError("each class needs at least n_splits examples for stratified folds")
+    rng = np.random.default_rng(seed)
+    fold = np.empty(y.size, dtype=np.intp)
+    for cls in (0.0, 1.0):
+        members = rng.permutation(np.flatnonzero(y == cls))
+        fold[members] = np.arange(members.size) % n_splits
+    out = np.empty_like(p)
+    for k in range(n_splits):
+        test = fold == k
+        cal = make().fit(p[~test], y[~test])
+        out[test] = cal.predict(p[test])
+    return out

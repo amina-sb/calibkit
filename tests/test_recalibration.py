@@ -16,6 +16,7 @@ from calibkit.recalibration import (
     NotFittedError,
     PlattCalibrator,
     Recalibrator,
+    cross_calibrate,
     expit,
     logit,
     pool_adjacent_violators,
@@ -206,3 +207,82 @@ def test_expit_is_stable_at_extremes() -> None:
 def test_negative_prior_rejected() -> None:
     with pytest.raises(ValueError):
         HistogramCalibrator(prior_strength=-1.0)
+
+
+# ---- cross-fitting ------------------------------------------------------------
+
+
+class _Recorder(Recalibrator):
+    """Identity map that records which forecasts it was fitted on."""
+
+    seen: list[frozenset[float]] = []  # noqa: RUF012
+
+    def _fit(self, p: Arr, y: Arr) -> None:
+        _Recorder.seen.append(frozenset(p.tolist()))
+
+    def _predict(self, p: Arr) -> Arr:
+        self.last_predicted = frozenset(p.tolist())
+        return p
+
+
+def test_cross_calibrate_never_fits_on_the_rows_it_predicts() -> None:
+    rng = np.random.default_rng(0)
+    p = rng.uniform(size=500)  # distinct values, so sets identify rows
+    y = (rng.uniform(size=500) < p).astype(np.float64)
+    _Recorder.seen = []
+    made: list[_Recorder] = []
+
+    def make() -> _Recorder:
+        made.append(_Recorder())
+        return made[-1]
+
+    out = cross_calibrate(make, p, y, n_splits=5)
+    np.testing.assert_array_equal(out, p)
+    assert len(made) == 5
+    for cal, fitted_on in zip(made, _Recorder.seen, strict=True):
+        assert cal.last_predicted.isdisjoint(fitted_on)
+        assert len(cal.last_predicted) + len(fitted_on) == 500
+
+
+def test_cross_calibrate_folds_are_stratified() -> None:
+    p, y = overconfident(1000, seed=5)
+    sizes: list[float] = []
+
+    class Rate(Recalibrator):
+        def _fit(self, p: Arr, y: Arr) -> None:
+            sizes.append(float(y.mean()))
+
+        def _predict(self, p: Arr) -> Arr:
+            return p
+
+    cross_calibrate(Rate, p, y, n_splits=4)
+    assert max(sizes) - min(sizes) < 0.005
+
+
+def test_cross_calibrate_reports_honest_histogram_ece() -> None:
+    p, y = overconfident(4000, seed=6)
+    in_sample = HistogramCalibrator(n_bins=10).fit(p, y).predict(p)
+    oof = cross_calibrate(lambda: HistogramCalibrator(n_bins=10), p, y, n_splits=5)
+    assert expected_calibration_error(y, in_sample, 10) == pytest.approx(0.0, abs=1e-12)
+    assert expected_calibration_error(y, oof, 10) > 0.005
+    assert expected_calibration_error(y, oof, 10) < expected_calibration_error(y, p, 10)
+
+
+def test_cross_calibrate_is_reproducible_and_seed_dependent() -> None:
+    p, y = overconfident(800, seed=7)
+    a = cross_calibrate(IsotonicCalibrator, p, y, seed=1)
+    b = cross_calibrate(IsotonicCalibrator, p, y, seed=1)
+    c = cross_calibrate(IsotonicCalibrator, p, y, seed=2)
+    np.testing.assert_array_equal(a, b)
+    assert not np.array_equal(a, c)
+
+
+@pytest.mark.parametrize("n_splits", [1, 0, 2.5])
+def test_cross_calibrate_rejects_bad_splits(n_splits: object) -> None:
+    with pytest.raises(ValueError):
+        cross_calibrate(IsotonicCalibrator, [0.2, 0.8] * 5, [0, 1] * 5, n_splits=n_splits)  # type: ignore[arg-type]
+
+
+def test_cross_calibrate_needs_enough_of_each_class() -> None:
+    with pytest.raises(ValueError, match="each class"):
+        cross_calibrate(IsotonicCalibrator, [0.1, 0.2, 0.3, 0.9], [0, 0, 0, 1], n_splits=2)
