@@ -18,6 +18,10 @@ y = (rng.uniform(size=p.size) < p**1.3).astype(int)  # outcomes; forecasts run h
 
 ck.expected_calibration_error(y, p, n_bins=15)
 ck.brier_decomposition(y, p, n_bins=10)
+
+# Out-of-fold recalibration: no forecast is adjusted using its own label.
+q = ck.cross_calibrate(ck.IsotonicCalibrator, p, y, n_splits=5, seed=0)
+ck.expected_calibration_error(y, q, n_bins=15)
 ```
 
 ## Metrics
@@ -44,5 +48,29 @@ depends on the forecasts. When outcomes track the forecast inside a bin, the
 three-term value overstates the score. When the within-bin spread is noise, it
 understates it. `BrierDecomposition` reports all five terms, so `reconstructed`
 equals `brier` to rounding error.
+
+## Recalibrators
+
+| Class | Map | Notes |
+| --- | --- | --- |
+| `PlattCalibrator` | `expit(a·logit(p) + b)` | Damped Newton; Platt's smoothed targets on by default; slope constrained to `a ≥ 0` |
+| `IsotonicCalibrator` | Non-decreasing step map, interpolated | Pool-adjacent-violators; matches `sklearn.isotonic.IsotonicRegression` |
+| `HistogramCalibrator` | Observed frequency per bin | Optional pseudo-count toward the bin midpoint |
+
+All three share `fit(y_prob, y_true)` and `predict(y_prob)`.
+
+**Platt's slope is constrained to be non-negative.** If the calibration data are
+anti-correlated with the scores, the unconstrained maximum-likelihood slope is
+negative and the "calibrated" output reverses the classifier's ranking. That
+changes which examples the model ranks first, which is not what calibration is
+for. The log-likelihood is concave, so the constrained optimum sits at `a = 0`:
+every input maps to the base rate, with a warning. Pass `monotone=False` for the
+textbook fit.
+
+**Score recalibrators out of sample.** A recalibrator evaluated on the data it was
+fitted on looks better than it is. Histogram binning scored with its own bins on
+its own fitting set has an ECE of exactly zero, whatever the data. The test suite
+pins that. `cross_calibrate` fits one recalibrator per stratified fold and
+predicts only the held-out fold, so the result can be scored honestly.
 
 See [ROADMAP.md](ROADMAP.md) for what is planned.
