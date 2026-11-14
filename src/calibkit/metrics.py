@@ -34,7 +34,7 @@ class ReliabilityTable:
     @property
     def weight(self) -> NDArray[np.float64]:
         """Fraction of all forecasts that fall in each bin."""
-        return self.count / self.count.sum()
+        return np.asarray(self.count / self.count.sum(), dtype=np.float64)
 
     @property
     def gap(self) -> NDArray[np.float64]:

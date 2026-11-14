@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
+from numpy.typing import NDArray
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import brier_score_loss
 
@@ -15,7 +16,7 @@ from calibkit.metrics import (
 
 
 @st.composite
-def forecasts(draw: st.DrawFn) -> tuple[np.ndarray, np.ndarray]:
+def forecasts(draw: st.DrawFn) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     n = draw(st.integers(1, 300))
     seed = draw(st.integers(0, 2**32 - 1))
     rng = np.random.default_rng(seed)
@@ -27,7 +28,7 @@ def forecasts(draw: st.DrawFn) -> tuple[np.ndarray, np.ndarray]:
     return y, p
 
 
-def _sample(n: int = 2000, seed: int = 0) -> tuple[np.ndarray, np.ndarray]:
+def _sample(n: int = 2000, seed: int = 0) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     rng = np.random.default_rng(seed)
     p = rng.beta(2, 3, size=n)
     y = (rng.uniform(size=n) < p**1.3).astype(int)
@@ -51,7 +52,7 @@ def test_reliability_table_matches_sklearn(strategy: str, rounded: bool) -> None
 
 
 @given(forecasts())
-def test_brier_matches_sklearn(data: tuple[np.ndarray, np.ndarray]) -> None:
+def test_brier_matches_sklearn(data: tuple[NDArray[np.float64], NDArray[np.float64]]) -> None:
     y, p = data
     assert brier_score(y, p) == pytest.approx(brier_score_loss(y, p), abs=1e-15)
 
@@ -70,7 +71,9 @@ def test_ece_worked_example() -> None:
 
 
 @given(forecasts(), st.integers(1, 25))
-def test_metric_bounds_and_ordering(data: tuple[np.ndarray, np.ndarray], n_bins: int) -> None:
+def test_metric_bounds_and_ordering(
+    data: tuple[NDArray[np.float64], NDArray[np.float64]], n_bins: int
+) -> None:
     y, p = data
     l1 = expected_calibration_error(y, p, n_bins)
     l2 = expected_calibration_error(y, p, n_bins, norm="l2")
@@ -81,7 +84,9 @@ def test_metric_bounds_and_ordering(data: tuple[np.ndarray, np.ndarray], n_bins:
 
 
 @given(forecasts(), st.integers(0, 2**32 - 1))
-def test_ece_invariant_to_row_order(data: tuple[np.ndarray, np.ndarray], seed: int) -> None:
+def test_ece_invariant_to_row_order(
+    data: tuple[NDArray[np.float64], NDArray[np.float64]], seed: int
+) -> None:
     y, p = data
     perm = np.random.default_rng(seed).permutation(y.size)
     a = expected_calibration_error(y, p, 10)
@@ -99,7 +104,7 @@ def test_ece_is_zero_when_frequencies_match_exactly() -> None:
 @settings(max_examples=200)
 @given(forecasts(), st.integers(1, 25), st.sampled_from(["uniform", "quantile"]))
 def test_five_term_decomposition_is_exact(
-    data: tuple[np.ndarray, np.ndarray], n_bins: int, strategy: str
+    data: tuple[NDArray[np.float64], NDArray[np.float64]], n_bins: int, strategy: str
 ) -> None:
     y, p = data
     d = brier_decomposition(y, p, n_bins, strategy)  # type: ignore[arg-type]
@@ -119,7 +124,7 @@ def test_three_term_identity_exact_for_bin_constant_forecasts() -> None:
     assert d.three_term == pytest.approx(d.brier, abs=1e-14)
 
 
-def _continuous(signal_within_bins: bool) -> tuple[np.ndarray, np.ndarray]:
+def _continuous(signal_within_bins: bool) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     rng = np.random.default_rng(4)
     p = rng.beta(2, 3, size=20_000)
     if signal_within_bins:

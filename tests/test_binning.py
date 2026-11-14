@@ -3,6 +3,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays
+from numpy.typing import NDArray
 
 from calibkit.binning import assign_bins, bin_edges
 
@@ -47,7 +48,7 @@ def test_quantile_bins_collapse_on_ties() -> None:
 
 
 @given(probs, st.integers(1, 30), st.sampled_from(["uniform", "quantile"]))
-def test_every_forecast_lands_in_a_valid_bin(p: np.ndarray, n: int, strategy: str) -> None:
+def test_every_forecast_lands_in_a_valid_bin(p: NDArray[np.float64], n: int, strategy: str) -> None:
     edges = bin_edges(p, n, strategy)  # type: ignore[arg-type]
     idx = assign_bins(p, edges)
     assert np.min(idx) >= 0 and np.max(idx) <= edges.size - 2

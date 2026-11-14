@@ -44,12 +44,13 @@ def bin_edges(
     if not isinstance(n_bins, (int, np.integer)) or isinstance(n_bins, bool) or n_bins < 1:
         raise ValueError(f"n_bins must be a positive integer, got {n_bins!r}")
     if strategy == "uniform":
-        return np.linspace(0.0, 1.0, int(n_bins) + 1)
+        return np.linspace(0.0, 1.0, int(n_bins) + 1, dtype=np.float64)
     if strategy == "quantile":
         p = check_probabilities(y_prob)
         inner = np.quantile(p, np.linspace(0.0, 1.0, int(n_bins) + 1)[1:-1])
-        edges = np.concatenate(([0.0], inner, [1.0]))
-        return np.unique(edges)
+        edges = np.concatenate(([0.0], inner, [1.0])).astype(np.float64)
+        unique: NDArray[np.float64] = np.unique(edges)
+        return unique
     raise ValueError(f"strategy must be 'uniform' or 'quantile', got {strategy!r}")
 
 
