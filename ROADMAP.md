@@ -7,10 +7,11 @@
 - [x] Reliability-diagram data (per-bin confidence, frequency, count)
 
 ## Phase 2 — Recalibrators
-- [ ] Platt scaling on the logit
-- [ ] Isotonic regression via pool-adjacent-violators
-- [ ] Histogram binning
-- [ ] Shared fit/predict API with input validation
+- [x] Platt scaling on the logit
+- [x] Isotonic regression via pool-adjacent-violators
+- [x] Histogram binning
+- [x] Shared fit/predict API with input validation
+- [x] Cross-fitted recalibration for out-of-fold scoring
 
 ## Phase 3 — Choosing the number of bins
 - [ ] Debiased ECE estimator
