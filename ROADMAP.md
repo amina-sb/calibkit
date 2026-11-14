@@ -14,9 +14,9 @@
 - [x] Cross-fitted recalibration for out-of-fold scoring
 
 ## Phase 3 — Choosing the number of bins
-- [ ] Debiased ECE estimator
-- [ ] Simulation of plug-in ECE bias on perfectly calibrated forecasts
-- [ ] Evidence script whose table the README reproduces, pinned by a test
+- [x] Debiased ECE estimator
+- [x] Simulation of plug-in ECE bias on perfectly calibrated forecasts
+- [x] Evidence script whose table the README reproduces, pinned by a test
 
 ## Phase 4 — Presentation and distribution
 - [ ] Reliability-diagram plotting
