@@ -186,3 +186,55 @@ def brier_decomposition(
         within_bin_variance=float(np.dot(dp, dp) / n),
         within_bin_covariance=float(np.dot(dp, dy) / n),
     )
+
+
+def debiased_calibration_error(
+    y_true: ArrayLike,
+    y_prob: ArrayLike,
+    n_bins: int = 15,
+    strategy: Strategy = "uniform",
+    squared: bool = False,
+) -> float:
+    """L2 calibration error with the finite-sample noise term removed.
+
+    Conditional on the forecasts, a bin's observed frequency ``f_k`` is the mean
+    of ``n_k`` Bernoulli outcomes with mean ``mu_k``, so
+
+        E[(c_k - f_k)^2] = (c_k - mu_k)^2 + mu_k (1 - mu_k) / n_k.
+
+    The plug-in estimator therefore overstates the squared error by the second
+    term, and ``f_k (1 - f_k) / (n_k - 1)`` is an unbiased estimate of it. Removing
+    it per bin gives an unbiased estimate of the binned squared calibration error
+    ``sum_k w_k (c_k - mu_k)^2``. This is the correction used by Kumar, Liang and
+    Ma (2019), *Verified Uncertainty Calibration*, NeurIPS.
+
+    Parameters
+    ----------
+    squared:
+        Return the squared-error estimate itself, which is unbiased and can be
+        negative. Otherwise return ``sqrt(max(estimate, 0))``, which is on the same
+        scale as ``expected_calibration_error(norm="l2")``. The square root is not
+        unbiased, but it is much less biased than the plug-in value.
+
+    The correction is exactly unbiased when the outcomes in a bin share one mean.
+    When their true probabilities ``mu_i`` differ within a bin, it removes slightly
+    too much, and the squared estimate is low by ``Var_i(mu_i) / (n_k - 1)`` in that
+    bin, where ``Var_i`` is the population variance of the ``mu_i``. That is small
+    when bins are narrow, and the test suite checks both cases by exact
+    enumeration.
+
+    Bins holding a single forecast have no variance estimate and contribute their
+    uncorrected term.
+    """
+    t = reliability_table(y_true, y_prob, n_bins, strategy)
+    mask = t.count > 0
+    n_k = t.count[mask].astype(np.float64)
+    f = t.observed_frequency[mask]
+    sq = t.gap[mask] ** 2
+    correction = np.zeros_like(sq)
+    many = n_k > 1
+    correction[many] = f[many] * (1.0 - f[many]) / (n_k[many] - 1.0)
+    estimate = float(np.dot(t.weight[mask], sq - correction))
+    if squared:
+        return estimate
+    return float(np.sqrt(max(estimate, 0.0)))
