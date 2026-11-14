@@ -21,6 +21,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
+from .intervals import debiased_replicates
 from .metrics import debiased_calibration_error, expected_calibration_error
 from .recalibration import expit, logit
 
@@ -36,6 +37,11 @@ def calibrated(p: FloatArray) -> FloatArray:
 def overconfident(p: FloatArray) -> FloatArray:
     """True probability ``expit(0.5 * logit(p) + 0.3)``: forecasts too extreme."""
     return expit(0.5 * logit(p) + 0.3)
+
+
+def slightly_overconfident(p: FloatArray) -> FloatArray:
+    """True probability ``expit(0.8 * logit(p))``: a mild, realistic miscalibration."""
+    return expit(0.8 * logit(p))
 
 
 def true_l2_error(g: TruthMap, grid_size: int = 200_001) -> float:
@@ -116,3 +122,51 @@ def bias_study(
         )
         for j, b in enumerate(bin_counts)
     ]
+
+
+def true_binned_sq_error(g: TruthMap, n_bins: int, grid_size: int = 300_000) -> float:
+    """Population squared L2 error of uniform forecasts over equal-width bins."""
+    p = (np.arange(grid_size, dtype=np.float64) + 0.5) / grid_size
+    k = np.minimum((p * n_bins).astype(np.intp), n_bins - 1)
+    gap = np.bincount(k, weights=p - g(p), minlength=n_bins) / np.bincount(k, minlength=n_bins)
+    return float(np.mean(gap**2))
+
+
+@dataclass(frozen=True)
+class Coverage:
+    """Fraction of datasets whose interval contained the true binned error."""
+
+    percentile: float
+    shift_corrected: float
+    datasets: int
+
+
+def interval_coverage(
+    g: TruthMap,
+    n: int,
+    n_bins: int,
+    datasets: int,
+    resamples: int,
+    seed: int,
+    confidence: float = 0.95,
+) -> Coverage:
+    """Coverage of plain and shift-corrected percentile bootstrap intervals.
+
+    Both intervals are built from the same bootstrap replicates of each dataset,
+    so the comparison is paired.
+    """
+    truth = true_binned_sq_error(g, n_bins)
+    rng = np.random.default_rng(seed)
+    alpha = (1.0 - confidence) / 2.0
+    hits = np.zeros(2)
+    for d in range(datasets):
+        p = rng.random(n)
+        y = (rng.random(n) < g(p)).astype(np.float64)
+        theta = debiased_calibration_error(y, p, n_bins, squared=True)
+        target = expected_calibration_error(y, p, n_bins, norm="l2") ** 2
+        reps = debiased_replicates(y, p, n_bins, "uniform", resamples, seed + 1 + d)
+        q_lo, q_hi = np.quantile(reps, [alpha, 1.0 - alpha])
+        hits[0] += q_lo <= truth <= q_hi
+        shift = target - theta
+        hits[1] += q_lo - shift <= truth <= q_hi - shift
+    return Coverage(float(hits[0] / datasets), float(hits[1] / datasets), datasets)

@@ -2,7 +2,7 @@
 
 Probability calibration for binary classifiers: calibration error with a binning
 choice you can defend, the Brier score decomposed into parts that actually add up,
-reliability-diagram data, and recalibrators tested against reference implementations.
+reliability diagrams with per-bin intervals, and recalibrators tested against reference implementations.
 
 ```bash
 pip install -e ".[dev]"
@@ -24,6 +24,19 @@ q = ck.cross_calibrate(ck.IsotonicCalibrator, p, y, n_splits=5, seed=0)
 ck.expected_calibration_error(y, q, n_bins=15)
 ```
 
+## Command line
+
+```bash
+calibkit predictions.csv --recalibrate platt isotonic --plot reliability.png
+```
+
+The CSV needs a header with `y_true` and `y_prob` columns (rename with
+`--label-col` and `--prob-col`). The report scores the input, every requested
+recalibrator out of fold, and an out-of-fold base-rate forecast as the baseline.
+Intervals are 95% bootstrap intervals, and the five-term Brier decomposition is
+printed underneath. `--plot` writes a reliability diagram with Wilson intervals
+on each bin and the forecast counts underneath.
+
 ## Metrics
 
 | Function | What it returns |
@@ -34,6 +47,9 @@ ck.expected_calibration_error(y, q, n_bins=15)
 | `brier_score` | Mean squared error of the forecast |
 | `brier_decomposition` | Reliability, resolution, uncertainty and two within-bin terms |
 | `debiased_calibration_error` | L2 calibration error with the finite-sample noise removed |
+| `calibration_error_interval` | Bootstrap interval for the binned L2 error, shift-corrected |
+| `percentile_interval` | Percentile bootstrap for nearly unbiased metrics such as Brier |
+| `wilson_interval` | Wilson score interval for a proportion; used per bin |
 
 **Bin edges.** Bins are right-closed, `(a, b]`, with the first bin also holding 0.
 That is the convention `sklearn.calibration.calibration_curve` uses, and the test
@@ -121,6 +137,16 @@ What the tables show:
 - **On perfectly calibrated forecasts the plug-in estimator reports miscalibration that is not there, and more of it with more bins.** At 15 bins it reads 0.027 (L1) on 2,000 forecasts whose true error is zero. The squared debiased estimate centres on zero at every bin count.
 - **Debiasing does not beat the plug-in at the plug-in's best bin count. It makes the bin count matter much less.** On the overconfident forecasts the best plug-in RMSE is 0.0102 and the best debiased RMSE is 0.0106. From 5 to 100 bins the plug-in's RMSE grows 3.6× and the debiased RMSE grows 1.1×.
 - **Debiasing removes bias, not variance.** With very few forecasts per bin the debiased estimate gets noisier. Across 5 seeds at n = 1,000, its RMSE at 100 bins (about 10 forecasts per bin) is 1.2–1.5× its value at 5 bins.
+
+**Intervals.**
+
+*Coverage of nominal 95% intervals for the binned L2 error, 15 bins, 2,000 forecasts, 200 datasets × 200 resamples. At exactly 95% coverage the standard error of each cell is 0.015.*
+
+| forecasts | true L2 error | percentile | shift-corrected percentile |
+| --- | ---: | ---: | ---: |
+| perfectly calibrated | 0.0000 | 0.695 | 1.000 |
+| slightly overconfident, `expit(0.8·logit(p))` | 0.0357 | 0.830 | 0.995 |
+| overconfident, `expit(0.5·logit(p) + 0.3)` | 0.1270 | 0.935 | 0.965 |
 <!-- evidence:end -->
 
 - A slightly negative mean for the squared debiased estimate is expected. When true
@@ -135,5 +161,18 @@ since the same model scores differently at different `n`.
 
 The seed-robustness tests (`tests/test_simulation.py`) re-run these claims at
 five base seeds and fail if any of them stops holding.
+
+**Intervals for calibration error need care.** A percentile bootstrap works for
+the Brier score, which is nearly unbiased. It does not work for calibration
+error. Inside the bootstrap world the "true" binned error is the sample's plug-in
+value, so the replicates of any calibration-error estimator sit above the
+estimate, and the percentile interval undercovers most where the error is
+smallest (see the coverage table above). `calibration_error_interval` removes that
+offset, which is known exactly inside the bootstrap world, and keeps the
+percentile shape. It is conservative near zero and close to nominal for a large
+error. A reflected ("basic") interval removes the same offset but flips the skew
+of a near-zero squared error, and on a single-bin baseline forecast it collapsed to
+`(0, 0)` even though that forecast's true error is not zero. That is why the shift-corrected form
+is used. The plug-in ECE gets no interval in the command-line report.
 
 See [ROADMAP.md](ROADMAP.md) for what is planned.

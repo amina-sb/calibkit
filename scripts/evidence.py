@@ -13,7 +13,15 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from calibkit.simulation import StudyRow, bias_study, calibrated, overconfident
+from calibkit.simulation import (
+    StudyRow,
+    bias_study,
+    calibrated,
+    interval_coverage,
+    overconfident,
+    slightly_overconfident,
+    true_binned_sq_error,
+)
 
 N = 2000
 BINS = (5, 10, 15, 25, 50, 100)
@@ -92,6 +100,37 @@ def findings(cal: list[StudyRow], over: list[StudyRow]) -> str:
     )
 
 
+COVER_DATASETS = 200
+COVER_RESAMPLES = 200
+COVER_BINS = 15
+
+
+def coverage_table() -> str:
+    out = [
+        "| forecasts | true L2 error | percentile | shift-corrected percentile |",
+        "| --- | ---: | ---: | ---: |",
+    ]
+    cases = [
+        ("perfectly calibrated", calibrated),
+        ("slightly overconfident, `expit(0.8·logit(p))`", slightly_overconfident),
+        ("overconfident, `expit(0.5·logit(p) + 0.3)`", overconfident),
+    ]
+    for i, (label, g) in enumerate(cases):
+        c = interval_coverage(g, N, COVER_BINS, COVER_DATASETS, COVER_RESAMPLES, SEED + 10 + i)
+        truth = true_binned_sq_error(g, COVER_BINS) ** 0.5
+        out.append(f"| {label} | {truth:.4f} | {c.percentile:.3f} | {c.shift_corrected:.3f} |")
+    se = (0.95 * 0.05 / COVER_DATASETS) ** 0.5
+    return "\n".join(
+        [
+            f"*Coverage of nominal 95% intervals for the binned L2 error, {COVER_BINS} bins, "
+            f"{N:,} forecasts, {COVER_DATASETS} datasets × {COVER_RESAMPLES} resamples. "
+            f"At exactly 95% coverage the standard error of each cell is {se:.3f}.*",
+            "",
+            *out,
+        ]
+    )
+
+
 def render() -> str:
     cal = bias_study(calibrated, N, BINS, REPS, SEED)
     over = bias_study(overconfident, N, BINS, REPS, SEED + 1)
@@ -114,6 +153,10 @@ def render() -> str:
             "What the tables show:",
             "",
             findings(cal, over),
+            "",
+            "**Intervals.**",
+            "",
+            coverage_table(),
             END,
         ]
     )
