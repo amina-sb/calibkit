@@ -297,3 +297,21 @@ def cross_calibrate(
         cal = make().fit(p[~test], y[~test])
         out[test] = cal.predict(p[test])
     return out
+
+
+class BaseRateCalibrator(Recalibrator):
+    """Baseline that ignores the forecast and predicts the fitted base rate.
+
+    It is perfectly calibrated in expectation and has no resolution, so its
+    Brier score is the uncertainty term. A model that does not beat it on the
+    Brier score has shown no skill, however good its calibration error looks.
+    """
+
+    def __init__(self) -> None:
+        self.rate_ = 0.5
+
+    def _fit(self, p: FloatArray, y: FloatArray) -> None:
+        self.rate_ = float(np.mean(y))
+
+    def _predict(self, p: FloatArray) -> FloatArray:
+        return np.full_like(p, self.rate_)

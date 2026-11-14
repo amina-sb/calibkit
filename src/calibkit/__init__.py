@@ -1,6 +1,7 @@
 """Probability calibration for binary classifiers."""
 
 from .binning import assign_bins, bin_edges
+from .intervals import calibration_error_interval, percentile_interval
 from .metrics import (
     BrierDecomposition,
     ReliabilityTable,
@@ -13,6 +14,7 @@ from .metrics import (
     wilson_interval,
 )
 from .recalibration import (
+    BaseRateCalibrator,
     ConvergenceWarning,
     HistogramCalibrator,
     IsotonicCalibrator,
@@ -25,6 +27,7 @@ from .recalibration import (
 __version__ = "0.1.0"
 
 __all__ = [
+    "BaseRateCalibrator",
     "BrierDecomposition",
     "ConvergenceWarning",
     "HistogramCalibrator",
@@ -38,10 +41,12 @@ __all__ = [
     "bin_edges",
     "brier_decomposition",
     "brier_score",
+    "calibration_error_interval",
     "cross_calibrate",
     "debiased_calibration_error",
     "expected_calibration_error",
     "maximum_calibration_error",
+    "percentile_interval",
     "reliability_table",
     "wilson_interval",
 ]
