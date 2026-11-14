@@ -1,10 +1,10 @@
 # Roadmap
 
 ## Phase 1 — Calibration metrics
-- [ ] Binning schemes: equal-width and equal-mass, with explicit edge handling
-- [ ] Expected and maximum calibration error (plug-in)
-- [ ] Brier score with Murphy decomposition, including the within-bin term
-- [ ] Reliability-diagram data (per-bin confidence, frequency, count)
+- [x] Binning schemes: equal-width and equal-mass, with explicit edge handling
+- [x] Expected and maximum calibration error (plug-in)
+- [x] Brier score with Murphy decomposition, including the within-bin terms
+- [x] Reliability-diagram data (per-bin confidence, frequency, count)
 
 ## Phase 2 — Recalibrators
 - [ ] Platt scaling on the logit
