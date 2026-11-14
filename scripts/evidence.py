@@ -29,7 +29,7 @@ def _ci(mean: float, lo: float, hi: float) -> str:
 
 def calibrated_table(rows: list[StudyRow]) -> str:
     out = [
-        "| bins | plug-in ECE (L1) | plug-in L2 | debiased L2 | debiased L2², ×10⁴ |",
+        "| bins | plug-in ECE (L1) | plug-in L2 | debiased L2 | debiased L2² ×10⁴, mean ± s.e. |",
         "| ---: | --- | --- | --- | --- |",
     ]
     for r in rows:
@@ -99,8 +99,8 @@ def render() -> str:
         [
             START,
             f"*{N:,} uniform forecasts, {REPS} replications, seed {SEED}. "
-            "Each cell is the mean, with the 2.5–97.5 percentile range across "
-            "replications in brackets. Regenerate with `python scripts/evidence.py`.*",
+            "Cells give the mean across replications, with the 2.5–97.5 percentile "
+            "range in brackets. Regenerate with `python scripts/evidence.py`.*",
             "",
             "**Perfectly calibrated forecasts.** The true error is 0 for every column.",
             "",

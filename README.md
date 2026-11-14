@@ -2,7 +2,7 @@
 
 Probability calibration for binary classifiers: calibration error with a binning
 choice you can defend, the Brier score decomposed into parts that actually add up,
-reliability diagrams, and recalibrators tested against reference implementations.
+reliability-diagram data, and recalibrators tested against reference implementations.
 
 ```bash
 pip install -e ".[dev]"
@@ -92,11 +92,11 @@ forecasts with outcomes drawn from a known probability map, so the true L2 error
 is an integral computed by quadrature.
 
 <!-- evidence:start -->
-*2,000 uniform forecasts, 500 replications, seed 20261114. Each cell is the mean, with the 2.5–97.5 percentile range across replications in brackets. Regenerate with `python scripts/evidence.py`.*
+*2,000 uniform forecasts, 500 replications, seed 20261114. Cells give the mean across replications, with the 2.5–97.5 percentile range in brackets. Regenerate with `python scripts/evidence.py`.*
 
 **Perfectly calibrated forecasts.** The true error is 0 for every column.
 
-| bins | plug-in ECE (L1) | plug-in L2 | debiased L2 | debiased L2², ×10⁴ |
+| bins | plug-in ECE (L1) | plug-in L2 | debiased L2 | debiased L2² ×10⁴, mean ± s.e. |
 | ---: | --- | --- | --- | --- |
 | 5 | 0.0159 (0.0063–0.0270) | 0.0194 (0.0077–0.0344) | 0.0060 (0.0000–0.0276) | -0.04 ± 0.13 |
 | 10 | 0.0219 (0.0121–0.0333) | 0.0278 (0.0158–0.0412) | 0.0070 (0.0000–0.0297) | -0.17 ± 0.18 |
