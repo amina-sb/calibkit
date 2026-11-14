@@ -19,6 +19,10 @@
 - [x] Evidence script whose table the README reproduces, pinned by a test
 
 ## Phase 4 — Presentation and distribution
-- [ ] Reliability-diagram plotting
+- [x] Per-bin Wilson intervals
+- [x] Bootstrap intervals for Brier score and calibration error, with measured coverage
+- [x] Reliability-diagram plotting
+- [x] Command-line report with an out-of-fold base-rate baseline
+- [x] Release workflow with trusted publishing
 - [ ] Documentation site
-- [ ] Release workflow with trusted publishing
+- [ ] First PyPI release
