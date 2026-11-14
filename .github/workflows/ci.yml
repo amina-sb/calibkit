@@ -27,3 +27,5 @@ jobs:
         run: mypy
       - name: Test
         run: pytest
+      - name: Evidence tables are current
+        run: python scripts/evidence.py --check
