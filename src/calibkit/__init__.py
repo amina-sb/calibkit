@@ -10,6 +10,7 @@ from .metrics import (
     expected_calibration_error,
     maximum_calibration_error,
     reliability_table,
+    wilson_interval,
 )
 from .recalibration import (
     ConvergenceWarning,
@@ -42,4 +43,5 @@ __all__ = [
     "expected_calibration_error",
     "maximum_calibration_error",
     "reliability_table",
+    "wilson_interval",
 ]

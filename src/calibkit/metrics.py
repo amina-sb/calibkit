@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from statistics import NormalDist
 from typing import Literal
 
 import numpy as np
@@ -40,6 +41,43 @@ class ReliabilityTable:
     def gap(self) -> NDArray[np.float64]:
         """``mean_confidence - observed_frequency``; positive means overconfident."""
         return self.mean_confidence - self.observed_frequency
+
+    def frequency_interval(
+        self, confidence: float = 0.95
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Wilson score interval for each bin's observed frequency (NaN if empty)."""
+        positives = np.rint(self.observed_frequency * self.count)
+        return wilson_interval(positives, self.count, confidence)
+
+
+def wilson_interval(
+    successes: ArrayLike, trials: ArrayLike, confidence: float = 0.95
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Wilson score interval for a binomial proportion.
+
+    Unlike the normal-approximation interval it stays inside [0, 1] and does not
+    collapse to zero width when a bin is all positives or all negatives, which
+    is common in the outer bins of a reliability diagram. Entries with zero
+    trials give NaN.
+    """
+    if not 0.0 < confidence < 1.0:
+        raise ValueError(f"confidence must be in (0, 1), got {confidence!r}")
+    k = np.asarray(successes, dtype=np.float64)
+    n = np.asarray(trials, dtype=np.float64)
+    if np.any(k < 0) or np.any(k > n):
+        raise ValueError("successes must lie between 0 and trials")
+    z = NormalDist().inv_cdf(0.5 + confidence / 2.0)
+    z2 = z * z
+    with np.errstate(invalid="ignore", divide="ignore"):
+        centre = (k + z2 / 2.0) / (n + z2)
+        half = z / (n + z2) * np.sqrt(k * (n - k) / n + z2 / 4.0)
+        lo = np.where(n > 0, np.clip(centre - half, 0.0, 1.0), np.nan)
+        hi = np.where(n > 0, np.clip(centre + half, 0.0, 1.0), np.nan)
+    # The endpoints are exactly 0 at k = 0 and 1 at k = n; set them so rounding
+    # does not leave 1e-17 where the formula gives zero.
+    lo = np.where((k == 0) & (n > 0), 0.0, lo)
+    hi = np.where((k == n) & (n > 0), 1.0, hi)
+    return lo, hi
 
 
 def _bin_sums(

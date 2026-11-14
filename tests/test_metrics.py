@@ -12,6 +12,7 @@ from calibkit.metrics import (
     expected_calibration_error,
     maximum_calibration_error,
     reliability_table,
+    wilson_interval,
 )
 
 
@@ -169,3 +170,50 @@ def test_empty_bins_are_nan_and_ignored() -> None:
 def test_rejects_unknown_norm() -> None:
     with pytest.raises(ValueError, match="norm"):
         expected_calibration_error([0, 1], [0.2, 0.8], norm="l3")  # type: ignore[arg-type]
+
+
+# ---- intervals ----------------------------------------------------------------
+
+
+@given(st.integers(0, 400), st.integers(1, 400), st.sampled_from([0.8, 0.9, 0.95, 0.99]))
+def test_wilson_matches_scipy(k: int, n: int, confidence: float) -> None:
+    from scipy.stats import binomtest
+
+    k = min(k, n)
+    lo, hi = wilson_interval(k, n, confidence)
+    ref = binomtest(k, n).proportion_ci(confidence_level=confidence, method="wilson")
+    assert float(lo) == pytest.approx(ref.low, abs=1e-12)
+    assert float(hi) == pytest.approx(ref.high, abs=1e-12)
+
+
+def test_wilson_nonzero_width_at_extremes_and_nan_when_empty() -> None:
+    lo, hi = wilson_interval([0, 10, 0], [10, 10, 0])
+    assert lo[0] == 0.0 and hi[0] > 0.2
+    assert hi[1] == 1.0 and lo[1] < 0.8
+    assert np.isnan(lo[2]) and np.isnan(hi[2])
+
+
+def test_wilson_rejects_bad_input() -> None:
+    with pytest.raises(ValueError, match="confidence"):
+        wilson_interval(1, 2, 1.0)
+    with pytest.raises(ValueError, match="between"):
+        wilson_interval(3, 2)
+
+
+def test_table_intervals_cover_observed_frequency() -> None:
+    y, p = _sample()
+    t = reliability_table(y, p, 10)
+    lo, hi = t.frequency_interval()
+    m = t.count > 0
+    assert np.all(lo[m] <= t.observed_frequency[m])
+    assert np.all(t.observed_frequency[m] <= hi[m])
+
+
+def test_wilson_coverage_by_simulation() -> None:
+    # 95% Wilson intervals should cover the true rate about 95% of the time.
+    rng = np.random.default_rng(8)
+    n, mu, reps = 60, 0.2, 20_000
+    k = (rng.random((reps, n)) < mu).sum(axis=1)
+    lo, hi = wilson_interval(k, np.full(reps, n))
+    coverage = float(np.mean((lo <= mu) & (mu <= hi)))
+    assert 0.93 < coverage < 0.97
